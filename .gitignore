@@ -1,0 +1,37 @@
+# Build artifacts
+build/
+*.bin
+*.elf
+*.map
+
+# Model data and weights
+main/model_data.h
+main/model_data.cc
+*.tflite
+*.onnx
+
+# ESP-IDF configuration and components
+sdkconfig.old
+managed_components/
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Editor and IDE files
+.vscode/
+.idea/
+.clangd/
+compile_commands.json
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# configs
+sdkconfig
