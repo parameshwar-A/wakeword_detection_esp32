@@ -54,7 +54,16 @@ wakeword_detection_esp32/
 
 > [!IMPORTANT]
 > **Model Data is NOT committed in this repository:**
-> [main/model_data.h](file:///home/paramesh/01_projects/02_esp/inmp441_wakeword_detect/main/model_data.h) contains model weights and is excluded via `.gitignore`. You **must** provide your own trained `.tflite` model and run [scripts/update_model.py](file:///home/paramesh/01_projects/02_esp/inmp441_wakeword_detect/scripts/update_model.py) to generate this header **before** building the project, otherwise the compiler will fail with `fatal error: model_data.h: No such file or directory`.
+> [main/model_data.h](file:///home/paramesh/01_projects/02_esp/inmp441_wakeword_detect/main/model_data.h) contains model weights and is excluded via `.gitignore`. You **must** provide your own trained `.tflite` model and run [scripts/update_model.py](file:///home/paramesh/01_projects/02_esp/inmp441_wakeword_detect/scripts/update_model.py) to port it into the firmware **before** building, otherwise the compiler will fail with `fatal error: model_data.h: No such file or directory`.
+>
+> **Model Tensor Shape Requirements:**
+> - **Input Tensor Shape**: Must be `[1, 49, 40]` (1-second audio frame divided into 49 time slices × 40 MFCC feature channels, INT8 quantized).
+> - **Output Tensor Shape**: Must be `[1, 2]` (binary classification: `[negative_score, wakeword_score]`, INT8 quantized).
+> - If you use a model with a different input shape or number of classes, you will need to adjust the firmware constants in [main/main.cc](file:///home/paramesh/01_projects/02_esp/inmp441_wakeword_detect/main/main.cc) and [main/audio_frontend.h](file:///home/paramesh/01_projects/02_esp/inmp441_wakeword_detect/main/audio_frontend.h).
+>
+> We **highly recommend** using our dedicated companion repositories:
+> - **Audio Dataset Recording**: [audio_recorder_esp32](https://github.com/parameshwar-A/audio_recorder_esp32) — Captures clean 16 kHz 16-bit mono training audio samples directly from an ESP32 + INMP441 setup.
+> - **Model Training & Quantization**: [esp32_wakeword_trainer](https://github.com/parameshwar-A/esp32_wakeword_trainer) — Trains a DS-CNN on recorded audio and exports a fully compatible INT8 quantized `.tflite` model.
 
 ---
 
@@ -103,50 +112,64 @@ Key constants in [main/main.cc](file:///home/paramesh/01_projects/02_esp/inmp441
 
 ## Step-by-Step Workflow: Setup, Build, Flash & Monitor
 
-Follow these steps in exact sequential order:
+Follow these steps in sequential order. Notice the environment tags specifying where each action takes place:
+- `[HOST PC]` — Run in your regular PC terminal (Python environment).
+- `[ESP-IDF]` — Run in a terminal with the ESP-IDF toolchain activated.
+- `[ESP32 HARDWARE]` — Physical interaction with the ESP32 board and microphone.
+
+---
 
 ### Prerequisites
 
-- **ESP-IDF v5.x** installed and configured in your environment.
-- Python 3 with `tensorflow` installed (required for running `update_model.py`).
+| Environment | Requirement | Setup Command |
+| :--- | :--- | :--- |
+| `[ESP-IDF]` | **ESP-IDF v5.x** toolchain | `. $HOME/esp/export.sh` |
+| `[HOST PC]` | **Python 3** with `tensorflow` | `pip install tensorflow` |
 
 ---
 
-### Step 1: Generate `model_data.h` (Model Conversion)
+### Step 1: Train & Port the Model `[HOST PC]`
 
-Because model data is excluded from git, generate `main/model_data.h` from your quantized `.tflite` model:
+Run this in your **regular PC terminal** with Python.
 
-```bash
-# From the project root:
-python3 scripts/update_model.py path/to/your_wakeword_model.tflite
-```
+1. **Train or Obtain a Model**:
+   Ensure you have an INT8 quantized `.tflite` model trained with the expected tensor shapes (`[1, 49, 40]` input, `[1, 2]` output):
+   - Record training audio using [audio_recorder_esp32](https://github.com/parameshwar-A/audio_recorder_esp32).
+   - Train and export the quantized model using [esp32_wakeword_trainer](https://github.com/parameshwar-A/esp32_wakeword_trainer).
 
-You should see output confirming:
-- Extracted input/output scale and zero point
-- Generated `main/model_data.h` with aligned byte array
+2. **Port the Model to Firmware**:
+   Run the model converter script pointing to your `.tflite` file:
+   ```bash
+   python3 scripts/update_model.py path/to/your_wakeword_model.tflite
+   ```
+
+   The script will:
+   - Verify that the model is INT8 quantized and has compatible input/output tensor shapes.
+   - Extract the exact input/output quantization `scale` and `zero_point`.
+   - Generate `main/model_data.h` with an aligned byte array in Flash memory.
 
 ---
 
-### Step 2: Build the Firmware
+### Step 2: Build the Firmware `[ESP-IDF]`
 
-Activate ESP-IDF and build the binary:
+Run this in an **ESP-IDF enabled terminal** on your computer:
 
 ```bash
-# Source ESP-IDF environment
+# 1. Source ESP-IDF environment
 . $HOME/esp/export.sh
 
-# Set target to standard ESP32 (if running for the first time)
+# 2. Set target to standard ESP32 (only needed once or after a clean build)
 idf.py set-target esp32
 
-# Compile the firmware
+# 3. Compile the firmware
 idf.py build
 ```
 
 ---
 
-### Step 3: Flash to ESP32
+### Step 3: Flash to ESP32 `[ESP-IDF]`
 
-Connect your ESP32 board via USB and flash the compiled binary:
+Connect your ESP32 board via USB data cable and flash the compiled binary:
 
 ```bash
 idf.py -p /dev/ttyUSB0 flash
@@ -155,7 +178,7 @@ idf.py -p /dev/ttyUSB0 flash
 
 ---
 
-### Step 4: Monitor Serial Output
+### Step 4: Monitor Output & Test `[ESP32 HARDWARE]`
 
 Open the serial monitor to view real-time inference latency and detection logs:
 
@@ -163,7 +186,7 @@ Open the serial monitor to view real-time inference latency and detection logs:
 idf.py -p /dev/ttyUSB0 monitor
 ```
 
-*(You can also combine steps 3 and 4 with `idf.py -p /dev/ttyUSB0 flash monitor`)*.
-
+- **Test Detection**: Speak your wake word into the INMP441 microphone. When detected, the LED on **GPIO 16** blinks, and detection logs with score & latency will print to the serial monitor.
 - To exit the serial monitor, press `Ctrl + ]`.
+
 
