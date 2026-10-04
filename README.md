@@ -1,4 +1,4 @@
-# ESP32 Native Wake Word Detection (`inmp441_wakeword_detect`)
+# ESP32 Native Wake Word Detection (`wakeword_detection_esp32`)
 
 An on-device, real-time wake word detection system running entirely on the standard ESP32 (dual-core Xtensa LX6 without vector extensions). The firmware captures audio using an **INMP441 I2S digital microphone**, extracts 40-channel MFCC features with **ESP-DSP**, and performs INT8 quantized neural network inference using **TensorFlow Lite Micro**.
 
@@ -36,7 +36,7 @@ An on-device, real-time wake word detection system running entirely on the stand
 ## Project Structure
 
 ```text
-inmp441_wakeword_detect/
+wakeword_detection_esp32/
 ├── CMakeLists.txt              # Root CMake configuration
 ├── sdkconfig.defaults          # Project default overrides (target esp32, 2MB flash, 160MHz CPU)
 ├── .gitignore                  # Git exclusions (build artifacts, model data, sdkconfig, etc.)
